@@ -12,5 +12,8 @@ Ubuntu 20.04
 mkdir & cd build
 cmake ..
 make
+# run image basics
 ./imageBasics ../ubuntu.png
+# run undistort image
+./undistortImage
 ```
