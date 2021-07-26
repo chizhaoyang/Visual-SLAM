@@ -9,7 +9,7 @@ Ubuntu 20.04
 
 ### How to use
 ```
-mkdir & cd build
+mkdir build && cd build
 cmake ..
 make
 # run image basics
