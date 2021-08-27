@@ -105,10 +105,10 @@ void BALProblem::WriteToFile(const std::string &filename) const {
         return;
     }
 
-    fprint(fptr, "%d %d %d %d\n", num_cameras_, num_cameras_, num_points_, num_observations_);
+    fprintf(fptr, "%d %d %d %d\n", num_cameras_, num_cameras_, num_points_, num_observations_);
 
     for (int i = 0; i < num_observations_; ++i) {
-        fprint(fptr, "%d %d", camera_index_[i], point_index_[i]);
+        fprintf(fptr, "%d %d", camera_index_[i], point_index_[i]);
         for (int j = 0; j < 2; ++j) {
             fprintf(fptr, " %g", observations_[2 * i + j]);
         }
@@ -178,7 +178,7 @@ void BALProblem::CameraToAngleAxisAndCenter(const double *camera,
     }
 
     // c = -R't
-    Eigen::vectorXd inverse_roation = -angle_axis_ref;
+    Eigen::VectorXd inverse_rotation = -angle_axis_ref;
     AngleAxisRotatePoint(inverse_rotation.data(),
                          camera + camera_block_size() - 6,
                          center);
@@ -212,5 +212,65 @@ void BALProblem::Normalize() {
         median(i) = Median(&tmp);
     }
 
-    //TODO
+    for (int i = 0; i < num_points_; ++i) {
+        VectorRef point(points + 3 * i, 3);
+        tmp[i] = (point -median).lpNorm<1>();
+    }
+
+    const double median_absolute_deviation = Median(&tmp);
+
+    // Scale so that the median absolute deviation of the resulting
+    // reconstruction is 100
+
+    const double scale = 100.0 / median_absolute_deviation;
+
+    // X = scale * (X - median)
+    for (int i = 0; i < num_points_; ++i) {
+        VectorRef point(points + 3 * i, 3);
+        point = scale * (point - median);
+    }
+
+    double *cameras = mutable_cameras();
+    double angle_axis[3];
+    double center[3];
+    for (int i = 0; i < num_cameras_; ++i) {
+        double *camera = cameras + camera_block_size() * i;
+        CameraToAngleAxisAndCenter(camera, angle_axis, center);
+        // center = scale * (center - median)
+        VectorRef(center, 3) = scale * (VectorRef(center, 3) - median);
+        AngleAxisAndCenterToCamera(angle_axis, center, camera);
+    }
+}
+
+void BALProblem::Perturb(const double rotation_sigma,
+                         const double translation_sigma,
+                         const double point_sigma) {
+    assert(point_sigma >= 0.0);
+    assert(rotation_sigma >= 0.0);
+    assert(tranlation_sigma >= 0.0);
+
+    double *points = mutable_points();
+    if (point_sigma > 0) {
+        for (int i = 0; i < num_points_; ++i) {
+            PerturbPoint3(point_sigma, points + 3 * i);
+        }
+    }
+
+    for (int i = 0; i < num_cameras_; ++i) {
+        double *camera = mutable_cameras() + camera_block_size() * i;
+
+        double angle_axis[3];
+        double center[3];
+        // Perturb in the rotation of the camera in the angle-axis
+        // representation
+        CameraToAngleAxisAndCenter(camera, angle_axis, center);
+        if (rotation_sigma > 0.0) {
+            PerturbPoint3(rotation_sigma, angle_axis);
+        }
+        AngleAxisAndCenterToCamera(angle_axis, center, camera);
+
+        if (translation_sigma > 0.0) {
+            PerturbPoint3(translation_sigma, camera + camera_block_size() - 6);
+        }
+    }
 }

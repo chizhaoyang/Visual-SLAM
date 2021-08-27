@@ -47,7 +47,7 @@ class BALProblem {
 
         const double *cameras() const { return parameters_; }
 
-        const double *points() const { return parameters_ + camera_blcok_size() * num_cameras_; }
+        const double *points() const { return parameters_ + camera_block_size() * num_cameras_; }
 
         // start address of the camera parameters
         double *mutable_cameras() { return parameters_; }
@@ -55,7 +55,7 @@ class BALProblem {
         double *mutable_points() { return parameters_ + camera_block_size() * num_cameras_; }
 
         double *mutable_camera_for_observation(int i) {
-            return mutable_cameras() + camera_index_[i] * camera_blcok_size();
+            return mutable_cameras() + camera_index_[i] * camera_block_size();
         }
 
         double *mutable_point_for_observation(int i) {
